@@ -1,0 +1,25 @@
+{
+  "name": "@bcirealm087/better-fetching",
+  "description": "Small lib with functions that can be used in the place of the regular fetch for additional quality of life features like limiting the number of simultaneously pending fetches and some error handling",
+  "version": "1.0.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "types": "dist/types/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "clean": "rimraf dist",
+    "build": "npm run clean && tsc",
+    "prepare": "npm run build"
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1",
+    "typescript": "^5.6.2"
+  }
+}
