@@ -5,28 +5,28 @@ function defaultFetchErrorFactory(response: Response, json: any) {
 
 class _BetterFetch {
   config: {
-    maxParallelRequests: number
+    maxParallelRequests: number, 
+    postLimitDelay: number
   }
   private nRequests;
-  private maximumRequestsPromise: Promise<void>|null;
-  private maximumRequestsResolve: (()=>void)|null;
+  private maximumRequestsResolves: (()=>void)[];
 
-  constructor(maxParallelRequests = 10) {
+  constructor(maxParallelRequests = 10, postLimitDelay = 250) {
+    if (maxParallelRequests <= 0) throw new Error('The maximum number of parallel requests has to be positive.');
     this.config = {
-      maxParallelRequests: maxParallelRequests
+      maxParallelRequests, 
+      postLimitDelay
     }
     this.nRequests = 0;
-    this.maximumRequestsResolve = this.maximumRequestsPromise = null;
+    this.maximumRequestsResolves = [];
   }
   
   private fetchWithLimitHandling(url: string, onFetchStart: ()=>void): ReturnType<typeof fetch> {
-    if (this.nRequests > this.config.maxParallelRequests) {
-      if (!this.maximumRequestsPromise) {
-        this.maximumRequestsPromise = new Promise<void>(resolve=>{
-          this.maximumRequestsResolve = resolve;
-        });
-      }
-      return this.maximumRequestsPromise.then(()=>this.fetchWithLimitHandling(url, onFetchStart));
+    if (this.nRequests >= this.config.maxParallelRequests) {
+      const maximumRequestsPromise = new Promise<void>(resolve=>{
+        this.maximumRequestsResolves.push(resolve);
+      }).then(()=>new Promise<void>(resolve=>setTimeout(resolve, this.config.postLimitDelay))); 
+      return maximumRequestsPromise.then(()=>this.fetchWithLimitHandling(url, onFetchStart));
     }
     this.nRequests+=1;
     onFetchStart();
@@ -38,9 +38,9 @@ class _BetterFetch {
   ) {
     return this.fetchWithLimitHandling(endpointURL, onFetchStart).finally(()=>{
       this.nRequests-=1;
-      if (this.maximumRequestsResolve && this.nRequests <= this.config.maxParallelRequests) {
-        this.maximumRequestsResolve();
-        this.maximumRequestsPromise = this.maximumRequestsResolve = null;
+      const resolve = this.maximumRequestsResolves.shift();
+      if (resolve && this.nRequests < this.config.maxParallelRequests) {
+        resolve();
       }
     })
       .then(response=> {
@@ -53,8 +53,8 @@ class _BetterFetch {
   }
 }
 
-export function BetterFetch(maxParallelRequests=10) {
-  const newFetchManager = new _BetterFetch(maxParallelRequests);
+export function BetterFetch(maxParallelRequests=10, postLimitDelay=250) {
+  const newFetchManager = new _BetterFetch(maxParallelRequests, postLimitDelay);
   return { 
     betterFetch: newFetchManager.betterFetch.bind(newFetchManager), 
     config: newFetchManager.config
